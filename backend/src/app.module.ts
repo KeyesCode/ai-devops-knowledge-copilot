@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { APP_GUARD } from '@nestjs/core';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { EmbeddingsModule } from './embeddings/embeddings.module';
@@ -9,6 +10,8 @@ import { GitHubModule } from './github/github.module';
 import { RetrievalModule } from './retrieval/retrieval.module';
 import { LLMModule } from './llm/llm.module';
 import { ChatModule } from './chat/chat.module';
+import { AuthModule } from './auth/auth.module';
+import { JwtAuthGuard } from './auth/jwt-auth.guard';
 
 @Module({
   imports: [
@@ -42,8 +45,15 @@ import { ChatModule } from './chat/chat.module';
     RetrievalModule,
     LLMModule,
     ChatModule,
+    AuthModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_GUARD,
+      useClass: JwtAuthGuard,
+    },
+  ],
 })
 export class AppModule {}

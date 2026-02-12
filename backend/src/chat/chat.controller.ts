@@ -9,10 +9,11 @@ import {
 import type { Response } from 'express';
 import { RetrievalService } from '../retrieval/retrieval.service';
 import { LLMService } from '../llm/llm.service';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { CurrentUserData } from '../auth/decorators/current-user.decorator';
 
 export interface ChatStreamRequest {
   query: string;
-  orgId: string;
   topK?: number;
   conversationHistory?: Array<{
     role: 'user' | 'assistant';
@@ -45,10 +46,12 @@ export class ChatController {
    * Body:
    * {
    *   "query": "user question",
-   *   "orgId": "organization-id",
    *   "topK": 5, // optional, defaults to 10
    *   "conversationHistory": [] // optional
    * }
+   *
+   * Headers:
+   * Authorization: Bearer <jwt-token>
    *
    * Response: SSE stream with:
    * - "token" events: streaming LLM tokens
@@ -57,20 +60,19 @@ export class ChatController {
   @Post('stream')
   async streamChat(
     @Body() dto: ChatStreamRequest,
+    @CurrentUser() user: CurrentUserData,
     @Res() res: Response,
   ): Promise<void> {
     // Validate request
     if (!dto.query || dto.query.trim().length === 0) {
       throw new BadRequestException('query is required');
     }
-    if (!dto.orgId) {
-      throw new BadRequestException('orgId is required');
-    }
 
     const topK = dto.topK || 10;
+    const orgId = user.orgId;
 
     this.logger.log(
-      `Stream chat request: query="${dto.query.substring(0, 100)}...", orgId=${dto.orgId}, topK=${topK}`,
+      `Stream chat request: query="${dto.query.substring(0, 100)}...", orgId=${orgId}, userId=${user.id}, topK=${topK}`,
     );
 
     // Set up SSE headers
@@ -84,7 +86,7 @@ export class ChatController {
       this.logger.debug('Retrieving context...');
       const retrievalResult = await this.retrievalService.retrieve(
         dto.query,
-        dto.orgId,
+        orgId,
         topK,
       );
 
