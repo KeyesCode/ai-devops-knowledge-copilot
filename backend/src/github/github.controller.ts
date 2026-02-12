@@ -6,11 +6,15 @@ import {
   HttpStatus,
   Logger,
   BadRequestException,
+  UseGuards,
 } from '@nestjs/common';
 import { GitHubIngestionService, SyncResult } from './github-ingestion.service';
 import type { SyncRepositoryDto } from './github-ingestion.service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { CurrentUserData } from '../auth/decorators/current-user.decorator';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { RolesGuard } from '../auth/roles.guard';
+import { UserRole } from '../entities/user.entity';
 
 @Controller('github')
 export class GitHubController {
@@ -21,7 +25,7 @@ export class GitHubController {
   ) {}
 
   /**
-   * Sync a GitHub repository
+   * Sync a GitHub repository (Admin only - creates sources)
    * POST /github/sync
    * 
    * Headers:
@@ -33,9 +37,13 @@ export class GitHubController {
    *   "repo": "repo-name",
    *   "branch": "main" // optional, defaults to "main"
    * }
+   * 
+   * Requires: ADMIN role or CREATE_SOURCE permission
    */
   @Post('sync')
   @HttpCode(HttpStatus.OK)
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN)
   async syncRepository(
     @Body() dto: Omit<SyncRepositoryDto, 'orgId'>,
     @CurrentUser() user: CurrentUserData,
