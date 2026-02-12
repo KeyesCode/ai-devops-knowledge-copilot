@@ -177,9 +177,10 @@ export class VectorStoreService {
       // Convert embedding array to PostgreSQL vector format
       const vectorString = `[${normalizedQueryEmbedding.join(',')}]`;
 
-      // Perform similarity search with org_id filtering
+      // Perform similarity search with org_id filtering for ACL enforcement
       // Join through: embeddings -> chunks -> documents -> sources
-      // Filter by sources.org_id for ACL
+      // Filter by sources.org_id to ensure users can only access sources from their organization
+      // This enforces Access Control List (ACL) at the database level
       // Use cosine distance (<=>) operator for similarity
       // 1 - distance gives us similarity (higher is better)
       const results: SimilaritySearchRow[] = await this.dataSource.query(
@@ -198,7 +199,7 @@ export class VectorStoreService {
         INNER JOIN chunks c ON c.id = e.chunk_id
         INNER JOIN documents d ON d.id = c.document_id
         INNER JOIN sources s ON s.id = d.source_id
-        WHERE s.org_id = $2
+        WHERE s.org_id = $2  -- ACL: Only return sources from the user's organization
         ORDER BY e.vector <=> $1::vector
         LIMIT $3;
         `,
