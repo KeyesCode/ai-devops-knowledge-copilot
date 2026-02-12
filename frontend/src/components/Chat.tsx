@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { MessageList } from './MessageList';
 import { ChatInput } from './ChatInput';
 import { CitationPanel } from './CitationPanel';
+import { GitHubSync } from './GitHubSync';
 import './Chat.css';
 
 interface ChatProps {
@@ -12,7 +13,7 @@ interface ChatProps {
   topK?: number;
 }
 
-export function Chat({ orgId, topK = 10 }: ChatProps) {
+export function Chat({ orgId, topK = 20 }: ChatProps) {
   const { user, logout } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -142,6 +143,7 @@ export function Chat({ orgId, topK = 10 }: ChatProps) {
           )}
         </div>
         <div className="chat-header-right">
+          <GitHubSync />
           {citations.length > 0 && (
             <button
               className="citation-button"

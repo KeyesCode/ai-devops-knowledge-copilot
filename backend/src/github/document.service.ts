@@ -31,6 +31,7 @@ interface ChunkRow {
 /**
  * Simple text splitter implementation
  * Splits text into chunks with overlap for better context preservation
+ * For markdown files, attempts to preserve structure by chunking at section boundaries
  */
 class SimpleTextSplitter {
   constructor(
@@ -38,7 +39,97 @@ class SimpleTextSplitter {
     private readonly chunkOverlap: number = 200,
   ) {}
 
+  /**
+   * Check if text appears to be markdown
+   */
+  private isMarkdown(text: string): boolean {
+    // Check for common markdown patterns
+    return /^#{1,6}\s/.test(text.trim()) || 
+           /\[.*\]\(.*\)/.test(text) || 
+           /^\s*[-*+]\s/.test(text) ||
+           /^\s*\d+\.\s/.test(text);
+  }
+
+  /**
+   * Split markdown text by sections (## headings) when possible
+   */
+  private splitMarkdownBySections(text: string): string[] {
+    const sections: string[] = [];
+    const lines = text.split('\n');
+    let currentSection: string[] = [];
+    let currentSectionSize = 0;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const isHeading = /^#{2,6}\s/.test(line);
+      
+      // If we hit a heading and have content, save current section
+      if (isHeading && currentSection.length > 0) {
+        const sectionText = currentSection.join('\n');
+        if (sectionText.trim().length > 0) {
+          sections.push(sectionText);
+        }
+        currentSection = [line];
+        currentSectionSize = line.length;
+        continue;
+      }
+
+      // Add line to current section
+      currentSection.push(line);
+      currentSectionSize += line.length + 1; // +1 for newline
+
+      // If section is getting too large, split it
+      if (currentSectionSize > this.chunkSize) {
+        const sectionText = currentSection.join('\n');
+        if (sectionText.trim().length > 0) {
+          sections.push(sectionText);
+        }
+        // Start new section with overlap
+        const overlapLines = Math.floor(this.chunkOverlap / 50); // Rough estimate
+        currentSection = currentSection.slice(-overlapLines);
+        currentSectionSize = currentSection.join('\n').length;
+      }
+    }
+
+    // Add remaining section
+    if (currentSection.length > 0) {
+      const sectionText = currentSection.join('\n');
+      if (sectionText.trim().length > 0) {
+        sections.push(sectionText);
+      }
+    }
+
+    // If we got sections, return them; otherwise fall back to regular splitting
+    if (sections.length > 1) {
+      return sections;
+    }
+    return [];
+  }
+
   splitText(text: string): string[] {
+    // Try markdown-aware splitting first
+    if (this.isMarkdown(text)) {
+      const markdownChunks = this.splitMarkdownBySections(text);
+      if (markdownChunks.length > 1) {
+        // Further split large sections if needed
+        const finalChunks: string[] = [];
+        for (const chunk of markdownChunks) {
+          if (chunk.length <= this.chunkSize) {
+            finalChunks.push(chunk);
+          } else {
+            // Split large sections using regular method
+            finalChunks.push(...this.splitTextRegular(chunk));
+          }
+        }
+        return finalChunks;
+      }
+    }
+
+    // Fall back to regular splitting
+    return this.splitTextRegular(text);
+  }
+
+  private splitTextRegular(text: string): string[] {
     if (text.length <= this.chunkSize) {
       return [text];
     }
@@ -151,9 +242,10 @@ export class DocumentService {
     private readonly embeddingService: EmbeddingService,
     private readonly vectorStoreService: VectorStoreService,
   ) {
-    // Initialize text splitter with reasonable defaults
-    // Chunk size: 1000 characters, overlap: 200 characters
-    this.textSplitter = new SimpleTextSplitter(1000, 200);
+    // Initialize text splitter with improved defaults
+    // Chunk size: 1500 characters, overlap: 300 characters
+    // Larger chunks preserve more context; more overlap reduces splits across important sections
+    this.textSplitter = new SimpleTextSplitter(1500, 300);
   }
 
   /**
@@ -511,6 +603,135 @@ export class DocumentService {
         error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(
         `Failed to process file ${filePath}: ${errorMessage}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * List all sources for an organization
+   * @param orgId - Organization ID
+   * @returns Promise resolving to array of sources with document and chunk counts
+   */
+  async listSources(orgId: string): Promise<Array<{
+    id: string;
+    name: string;
+    type: string;
+    url: string;
+    metadata: Record<string, any>;
+    documentCount: number;
+    chunkCount: number;
+    createdAt: string;
+    updatedAt: string;
+  }>> {
+    try {
+      const sources = await this.dataSource.query(
+        `
+        SELECT 
+          s.id,
+          s.name,
+          s.type,
+          s.url,
+          s.metadata,
+          s.created_at,
+          s.updated_at,
+          COUNT(DISTINCT d.id) as document_count,
+          COUNT(DISTINCT c.id) as chunk_count
+        FROM sources s
+        LEFT JOIN documents d ON d.source_id = s.id
+        LEFT JOIN chunks c ON c.document_id = d.id
+        WHERE s.org_id = $1
+        GROUP BY s.id, s.name, s.type, s.url, s.metadata, s.created_at, s.updated_at
+        ORDER BY s.updated_at DESC
+        `,
+        [orgId],
+      );
+
+      return sources.map((row: any) => ({
+        id: row.id,
+        name: row.name,
+        type: row.type,
+        url: row.url,
+        metadata: row.metadata || {},
+        documentCount: parseInt(row.document_count, 10) || 0,
+        chunkCount: parseInt(row.chunk_count, 10) || 0,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      }));
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(
+        `Failed to list sources: ${errorMessage}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * List all documents for a source
+   * @param sourceId - Source ID
+   * @param orgId - Organization ID (for ACL verification)
+   * @returns Promise resolving to array of documents with chunk counts
+   */
+  async listDocuments(
+    sourceId: string,
+    orgId: string,
+  ): Promise<Array<{
+    id: string;
+    title: string;
+    url: string;
+    metadata: Record<string, any>;
+    chunkCount: number;
+    createdAt: string;
+    updatedAt: string;
+  }>> {
+    try {
+      // Verify source belongs to org
+      const sourceCheck = await this.dataSource.query(
+        `SELECT id FROM sources WHERE id = $1 AND org_id = $2`,
+        [sourceId, orgId],
+      );
+
+      if (sourceCheck.length === 0) {
+        throw new Error('Source not found or access denied');
+      }
+
+      const documents = await this.dataSource.query(
+        `
+        SELECT 
+          d.id,
+          d.title,
+          d.url,
+          d.metadata,
+          d.created_at,
+          d.updated_at,
+          COUNT(DISTINCT c.id) as chunk_count
+        FROM documents d
+        LEFT JOIN chunks c ON c.document_id = d.id
+        WHERE d.source_id = $1
+        GROUP BY d.id, d.title, d.url, d.metadata, d.created_at, d.updated_at
+        ORDER BY d.title
+        `,
+        [sourceId],
+      );
+
+      return documents.map((row: any) => ({
+        id: row.id,
+        title: row.title,
+        url: row.url,
+        metadata: row.metadata || {},
+        chunkCount: parseInt(row.chunk_count, 10) || 0,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      }));
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(
+        `Failed to list documents: ${errorMessage}`,
         error instanceof Error ? error.stack : undefined,
       );
       throw error;

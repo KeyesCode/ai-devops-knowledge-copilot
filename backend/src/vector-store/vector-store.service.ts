@@ -134,13 +134,13 @@ export class VectorStoreService {
    * Perform similarity search using cosine distance
    * Returns the top K most similar chunks filtered by organization ID
    * @param queryEmbedding - The query embedding vector
-   * @param topK - Number of results to return (default: 10)
+   * @param topK - Number of results to return (default: 20)
    * @param orgId - Organization ID to filter results by
    * @returns Promise resolving to array of similarity search results
    */
   async similaritySearch(
     queryEmbedding: number[],
-    topK: number = 10,
+    topK: number = 20,
     orgId: string,
   ): Promise<SimilaritySearchResult[]> {
     try {

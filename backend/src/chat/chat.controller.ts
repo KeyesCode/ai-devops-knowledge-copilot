@@ -68,7 +68,7 @@ export class ChatController {
       throw new BadRequestException('query is required');
     }
 
-    const topK = dto.topK || 10;
+    const topK = dto.topK || 20;
     const orgId = user.orgId;
 
     this.logger.log(
@@ -179,17 +179,19 @@ export class ChatController {
       return `You are a helpful AI assistant. Answer questions based on your knowledge. If you don't know something, say so.`;
     }
 
-    return `You are a helpful AI assistant that answers questions based on the provided context from documentation.
+    return `You are a helpful AI assistant that answers questions based EXCLUSIVELY on the provided context from documentation.
 
-Use the following context to answer the user's question. If the context doesn't contain enough information to answer the question, say so. Cite specific parts of the context when relevant.
+CRITICAL: You MUST use ONLY the information provided in the context below. Do NOT use any external knowledge or information not present in the context. If the context doesn't contain enough information to fully answer the question, explicitly state what information is missing.
 
 Context:
 ${context}
 
 Instructions:
-- Answer the question based on the context provided above
+- Answer the question based EXCLUSIVELY on the context provided above
+- Do NOT use any information outside of the provided context
+- If the context doesn't contain relevant information, explicitly say so
+- Cite specific parts of the context when relevant
 - Be concise and accurate
-- If the context doesn't contain relevant information, say so
 - Use natural language and be helpful`;
   }
 }
