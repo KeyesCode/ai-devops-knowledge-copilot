@@ -5,6 +5,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { EmbeddingsModule } from './embeddings/embeddings.module';
 import { VectorStoreModule } from './vector-store/vector-store.module';
+import { GitHubModule } from './github/github.module';
 
 @Module({
   imports: [
@@ -25,11 +26,16 @@ import { VectorStoreModule } from './vector-store/vector-store.module';
         migrations: [__dirname + '/migrations/*{.ts,.js}'],
         synchronize: false, // Use migrations instead
         migrationsRun: false, // Auto-run migrations on startup
+        extra: {
+          max: 5, // Limit connection pool to 5 connections to reduce memory usage
+          connectionTimeoutMillis: 10000,
+        },
       }),
       inject: [ConfigService],
     }),
     EmbeddingsModule,
     VectorStoreModule,
+    GitHubModule,
   ],
   controllers: [AppController],
   providers: [AppService],

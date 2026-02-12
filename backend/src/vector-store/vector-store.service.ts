@@ -68,8 +68,30 @@ export class VectorStoreService {
         throw new Error('model name is required');
       }
 
+      // Pad embedding to 1536 dimensions if needed (for IVFFlat index compatibility)
+      // This allows Ollama (768 dims) and OpenAI (1536 dims) to coexist
+      const TARGET_DIMENSION = 1536;
+      let normalizedEmbedding: number[] = embedding;
+
+      if (embedding.length < TARGET_DIMENSION) {
+        // Pad with zeros to reach target dimension
+        const padding = new Array<number>(
+          TARGET_DIMENSION - embedding.length,
+        ).fill(0);
+        normalizedEmbedding = [...embedding, ...padding];
+        this.logger.debug(
+          `Padded embedding from ${embedding.length} to ${TARGET_DIMENSION} dimensions`,
+        );
+      } else if (embedding.length > TARGET_DIMENSION) {
+        // Truncate if somehow larger (shouldn't happen, but be safe)
+        normalizedEmbedding = embedding.slice(0, TARGET_DIMENSION);
+        this.logger.warn(
+          `Truncated embedding from ${embedding.length} to ${TARGET_DIMENSION} dimensions`,
+        );
+      }
+
       // Convert embedding array to PostgreSQL vector format
-      const vectorString = `[${embedding.join(',')}]`;
+      const vectorString = `[${normalizedEmbedding.join(',')}]`;
 
       // Use ON CONFLICT to upsert (insert or update if chunk_id already exists)
       const result: UpsertResultRow[] = await this.dataSource.query(
@@ -133,8 +155,27 @@ export class VectorStoreService {
         throw new Error('orgId is required for ACL filtering');
       }
 
+      // Pad query embedding to 1536 dimensions if needed (same as stored embeddings)
+      const TARGET_DIMENSION = 1536;
+      let normalizedQueryEmbedding: number[] = queryEmbedding;
+
+      if (queryEmbedding.length < TARGET_DIMENSION) {
+        const padding = new Array<number>(
+          TARGET_DIMENSION - queryEmbedding.length,
+        ).fill(0);
+        normalizedQueryEmbedding = [...queryEmbedding, ...padding];
+        this.logger.debug(
+          `Padded query embedding from ${queryEmbedding.length} to ${TARGET_DIMENSION} dimensions`,
+        );
+      } else if (queryEmbedding.length > TARGET_DIMENSION) {
+        normalizedQueryEmbedding = queryEmbedding.slice(0, TARGET_DIMENSION);
+        this.logger.warn(
+          `Truncated query embedding from ${queryEmbedding.length} to ${TARGET_DIMENSION} dimensions`,
+        );
+      }
+
       // Convert embedding array to PostgreSQL vector format
-      const vectorString = `[${queryEmbedding.join(',')}]`;
+      const vectorString = `[${normalizedQueryEmbedding.join(',')}]`;
 
       // Perform similarity search with org_id filtering
       // Join through: embeddings -> chunks -> documents -> sources
