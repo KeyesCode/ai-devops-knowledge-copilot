@@ -20,7 +20,9 @@ import { AppService } from './app.service';
         password: configService.get<string>('DB_PASSWORD'),
         database: configService.get<string>('DB_NAME'),
         entities: [__dirname + '/**/*.entity{.ts,.js}'],
-        synchronize: true, // Auto-create tables (dev only)
+        migrations: [__dirname + '/migrations/*{.ts,.js}'],
+        synchronize: false, // Use migrations instead
+        migrationsRun: false, // Auto-run migrations on startup
       }),
       inject: [ConfigService],
     }),
