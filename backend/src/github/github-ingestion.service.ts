@@ -13,6 +13,7 @@ export interface SyncRepositoryDto {
   owner: string;
   repo: string;
   branch?: string;
+  orgId: string;
 }
 
 export interface SyncResult {
@@ -57,11 +58,11 @@ export class GitHubIngestionService {
    * @returns Promise resolving to sync result
    */
   async syncRepository(dto: SyncRepositoryDto): Promise<SyncResult> {
-    const { owner, repo, branch = 'main' } = dto;
+    const { owner, repo, branch = 'main', orgId } = dto;
     const repoUrl = `https://github.com/${owner}/${repo}`;
 
     this.logger.log(
-      `Starting repository sync: ${owner}/${repo} (branch: ${branch})`,
+      `Starting repository sync: ${owner}/${repo} (branch: ${branch}, orgId: ${orgId})`,
     );
 
     const errors: string[] = [];
@@ -100,6 +101,7 @@ export class GitHubIngestionService {
         `${owner}/${repo}`,
         'github',
         repoUrl,
+        orgId,
         {
           owner,
           repo,

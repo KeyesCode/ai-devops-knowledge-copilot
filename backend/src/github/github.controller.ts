@@ -9,6 +9,8 @@ import {
 } from '@nestjs/common';
 import { GitHubIngestionService, SyncResult } from './github-ingestion.service';
 import type { SyncRepositoryDto } from './github-ingestion.service';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { CurrentUserData } from '../auth/decorators/current-user.decorator';
 
 @Controller('github')
 export class GitHubController {
@@ -22,6 +24,9 @@ export class GitHubController {
    * Sync a GitHub repository
    * POST /github/sync
    * 
+   * Headers:
+   * Authorization: Bearer <jwt-token>
+   * 
    * Body:
    * {
    *   "owner": "owner-name",
@@ -32,10 +37,11 @@ export class GitHubController {
   @Post('sync')
   @HttpCode(HttpStatus.OK)
   async syncRepository(
-    @Body() dto: SyncRepositoryDto,
+    @Body() dto: Omit<SyncRepositoryDto, 'orgId'>,
+    @CurrentUser() user: CurrentUserData,
   ): Promise<SyncResult> {
     this.logger.log(
-      `Sync request received for ${dto.owner}/${dto.repo}`,
+      `Sync request received for ${dto.owner}/${dto.repo} by user ${user.id} (org: ${user.orgId})`,
     );
 
     // Validate required fields
@@ -43,7 +49,10 @@ export class GitHubController {
       throw new BadRequestException('owner and repo are required');
     }
 
-    return this.githubIngestionService.syncRepository(dto);
+    return this.githubIngestionService.syncRepository({
+      ...dto,
+      orgId: user.orgId,
+    });
   }
 }
 

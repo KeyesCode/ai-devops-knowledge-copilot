@@ -168,13 +168,14 @@ export class DocumentService {
     name: string,
     type: string,
     url: string,
+    orgId: string,
     metadata: Record<string, any> = {},
   ): Promise<string> {
     try {
-      // Check if source already exists by URL
+      // Check if source already exists by URL and orgId
       const existing = await this.dataSource.query(
-        `SELECT id FROM sources WHERE url = $1 LIMIT 1`,
-        [url],
+        `SELECT id FROM sources WHERE url = $1 AND org_id = $2 LIMIT 1`,
+        [url, orgId],
       );
 
       if (existing.length > 0) {
@@ -191,10 +192,10 @@ export class DocumentService {
 
       // Create new source
       const result: SourceRow[] = await this.dataSource.query(
-        `INSERT INTO sources (name, type, url, metadata)
-         VALUES ($1, $2, $3, $4)
+        `INSERT INTO sources (name, type, url, org_id, metadata)
+         VALUES ($1, $2, $3, $4, $5)
          RETURNING id`,
-        [name, type, url, JSON.stringify(metadata)],
+        [name, type, url, orgId, JSON.stringify(metadata)],
       );
 
       if (!result || result.length === 0) {
