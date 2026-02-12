@@ -43,6 +43,7 @@ export function EvalDashboard() {
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [topK, setTopK] = useState(20);
+  const [hybridWeight, setHybridWeight] = useState(0.5);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createForm, setCreateForm] = useState({
     name: '',
@@ -169,7 +170,7 @@ export function EvalDashboard() {
 
     try {
       const response = await fetch(
-        `${API_BASE_URL}/eval/sets/${evalSetId}/run?topK=${topK}`,
+        `${API_BASE_URL}/eval/sets/${evalSetId}/run?topK=${topK}&hybridWeight=${hybridWeight}`,
         {
           method: 'POST',
           headers: {
@@ -192,7 +193,7 @@ export function EvalDashboard() {
     } finally {
       setIsRunning(false);
     }
-  }, [token, topK, loadRuns, loadResults]);
+  }, [token, topK, hybridWeight, loadRuns, loadResults]);
 
   // Poll for running evaluations
   useEffect(() => {
@@ -254,6 +255,41 @@ export function EvalDashboard() {
               style={{ marginLeft: '8px', width: '60px' }}
             />
           </label>
+          <div className="hybrid-weight-control" style={{ marginLeft: '16px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px' }}>
+              Hybrid Weight:
+              <div className="hybrid-weight-input-group">
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.1"
+                  value={hybridWeight}
+                  onChange={(e) => setHybridWeight(parseFloat(e.target.value))}
+                  className="hybrid-weight-slider"
+                  title="0.0 = BM25 only, 0.5 = Hybrid (equal), 1.0 = Vector only"
+                />
+                <input
+                  type="number"
+                  min="0"
+                  max="1"
+                  step="0.1"
+                  value={hybridWeight}
+                  onChange={(e) => {
+                    const value = parseFloat(e.target.value);
+                    if (!isNaN(value) && value >= 0 && value <= 1) {
+                      setHybridWeight(value);
+                    }
+                  }}
+                  className="hybrid-weight-number"
+                  title="0.0 = BM25 only, 0.5 = Hybrid (equal), 1.0 = Vector only"
+                />
+              </div>
+              <span className="hybrid-weight-label">
+                {hybridWeight === 0 ? 'BM25 only' : hybridWeight === 1 ? 'Vector only' : hybridWeight === 0.5 ? 'Hybrid (equal)' : `Hybrid (${(hybridWeight * 100).toFixed(0)}% vector)`}
+              </span>
+            </label>
+          </div>
         </div>
       </div>
 

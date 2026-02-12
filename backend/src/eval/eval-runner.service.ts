@@ -51,6 +51,7 @@ export class EvalRunnerService {
     evalSetId: string,
     orgId: string,
     topK: number = 20,
+    hybridWeight: number = 0.5,
   ): Promise<EvalRunResponse> {
     this.logger.log(`Starting evaluation for eval set: ${evalSetId}`);
 
@@ -85,6 +86,7 @@ export class EvalRunnerService {
           orgId,
           topK,
           evalSet.scopedSources || null,
+          hybridWeight,
         );
         completedCount++;
         
@@ -128,6 +130,7 @@ export class EvalRunnerService {
     orgId: string,
     topK: number,
     scopedSources: string[] | null,
+    hybridWeight: number = 0.5,
   ): Promise<void> {
     this.logger.debug(`Processing question: ${questionId}`);
 
@@ -136,6 +139,7 @@ export class EvalRunnerService {
       question,
       orgId,
       topK,
+      hybridWeight,
     );
 
     // Filter by scoped sources if specified

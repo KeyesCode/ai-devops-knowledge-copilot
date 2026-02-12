@@ -26,6 +26,7 @@
     "test:embedding": "ts-node -r tsconfig-paths/register src/scripts/test-embedding.ts",
     "test:auth": "ts-node -r tsconfig-paths/register src/scripts/test-auth.ts",
     "test:eval-schema": "ts-node -r tsconfig-paths/register src/scripts/test-eval-schema.ts",
+    "test:hybrid-vs-vector": "ts-node -r tsconfig-paths/register src/scripts/test-hybrid-vs-vector.ts",
     "create-test-user": "ts-node -r tsconfig-paths/register src/scripts/create-test-user.ts"
   },
   "dependencies": {

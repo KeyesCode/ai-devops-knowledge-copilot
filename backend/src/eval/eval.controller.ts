@@ -187,10 +187,12 @@ export class EvalController {
     @Param('evalSetId') evalSetId: string,
     @CurrentUser() user: CurrentUserData,
     @Query('topK') topK?: string,
+    @Query('hybridWeight') hybridWeight?: string,
   ): Promise<EvalRunResponse> {
     this.logger.log(`Starting evaluation for eval set: ${evalSetId}`);
     const topKValue = topK ? parseInt(topK, 10) : 10;
-    return this.evalRunnerService.runEvaluation(evalSetId, user.orgId, topKValue);
+    const hybridWeightValue = hybridWeight ? parseFloat(hybridWeight) : 0.5;
+    return this.evalRunnerService.runEvaluation(evalSetId, user.orgId, topKValue, hybridWeightValue);
   }
 
   /**
