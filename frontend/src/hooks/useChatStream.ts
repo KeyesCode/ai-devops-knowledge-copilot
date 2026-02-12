@@ -59,7 +59,7 @@ export function useChatStream() {
           },
           body: JSON.stringify({
             query: options.query,
-            topK: options.topK || 10,
+            topK: options.topK || 20,
             conversationHistory: options.conversationHistory || [],
           }),
           signal: abortControllerRef.current.signal,

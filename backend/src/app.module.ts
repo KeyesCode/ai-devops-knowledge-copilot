@@ -11,6 +11,7 @@ import { RetrievalModule } from './retrieval/retrieval.module';
 import { LLMModule } from './llm/llm.module';
 import { ChatModule } from './chat/chat.module';
 import { AuthModule } from './auth/auth.module';
+import { EvalModule } from './eval/eval.module';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 
 @Module({
@@ -46,6 +47,7 @@ import { JwtAuthGuard } from './auth/jwt-auth.guard';
     LLMModule,
     ChatModule,
     AuthModule,
+    EvalModule,
   ],
   controllers: [AppController],
   providers: [
