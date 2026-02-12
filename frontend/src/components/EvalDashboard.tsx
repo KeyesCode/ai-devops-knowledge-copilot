@@ -20,6 +20,10 @@ interface EvalRun {
   completedQuestions: number;
   createdAt: string;
   completedAt: string | null;
+  metadata?: {
+    topK?: number;
+    hybridWeight?: number;
+  };
 }
 
 interface EvalResult {
@@ -401,6 +405,23 @@ export function EvalDashboard() {
                             {run.completedQuestions} / {run.totalQuestions} questions
                           </span>
                         </div>
+                        {(run.metadata?.topK !== undefined || run.metadata?.hybridWeight !== undefined) && (
+                          <div className="eval-run-params">
+                            {run.metadata?.topK !== undefined && (
+                              <span className="eval-run-param">
+                                Top K: {run.metadata.topK}
+                              </span>
+                            )}
+                            {run.metadata?.hybridWeight !== undefined && (
+                              <span className="eval-run-param">
+                                Hybrid: {run.metadata.hybridWeight === 0 ? 'BM25 only' : 
+                                         run.metadata.hybridWeight === 1 ? 'Vector only' : 
+                                         run.metadata.hybridWeight === 0.5 ? 'Hybrid (equal)' : 
+                                         `${(run.metadata.hybridWeight * 100).toFixed(0)}% vector`}
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>

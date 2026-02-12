@@ -63,12 +63,16 @@ export class EvalRunnerService {
       throw new NotFoundException('No questions found in eval set');
     }
 
-    // Create eval run
+    // Create eval run with metadata
+    const metadata = {
+      topK,
+      hybridWeight,
+    };
     const runResult = await this.dataSource.query(
-      `INSERT INTO eval_runs (eval_set_id, org_id, status, total_questions)
-       VALUES ($1, $2, $3, $4)
+      `INSERT INTO eval_runs (eval_set_id, org_id, status, total_questions, metadata)
+       VALUES ($1, $2, $3, $4, $5)
        RETURNING id, eval_set_id, org_id, status, total_questions, completed_questions, metadata, created_at, updated_at, completed_at`,
-      [evalSetId, orgId, EvalRunStatus.RUNNING, questions.length],
+      [evalSetId, orgId, EvalRunStatus.RUNNING, questions.length, JSON.stringify(metadata)],
     );
     const evalRunId = runResult[0].id;
 
