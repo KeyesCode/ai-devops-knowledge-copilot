@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { EmbeddingsModule } from './embeddings/embeddings.module';
+import { VectorStoreModule } from './vector-store/vector-store.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { EmbeddingsModule } from './embeddings/embeddings.module';
       inject: [ConfigService],
     }),
     EmbeddingsModule,
+    VectorStoreModule,
   ],
   controllers: [AppController],
   providers: [AppService],
