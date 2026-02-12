@@ -4,6 +4,7 @@ import {
   VectorStoreService,
   SimilaritySearchResult,
 } from '../vector-store/vector-store.service';
+import { BM25SearchService } from '../vector-store/bm25-search.service';
 
 export interface RetrievalResult {
   query: string;
@@ -36,24 +37,29 @@ export class RetrievalService {
   constructor(
     private readonly embeddingService: EmbeddingService,
     private readonly vectorStoreService: VectorStoreService,
+    private readonly bm25SearchService: BM25SearchService,
   ) {}
 
   /**
-   * Perform full RAG retrieval pipeline:
+   * Perform full RAG retrieval pipeline with hybrid search (BM25 + Vector):
    * 1. Embed user query
-   * 2. Fetch topK chunks using similarity search
-   * 3. Format context block
-   * 4. Return structured retrieval result with scoring
+   * 2. Perform both BM25 (keyword) and Vector (semantic) search in parallel
+   * 3. Combine and normalize scores from both methods
+   * 4. Apply metadata-based boosting
+   * 5. Format context block
+   * 6. Return structured retrieval result with scoring
    *
    * @param query - The user query string
    * @param topK - Number of top chunks to retrieve (default: 20)
    * @param orgId - Organization ID for ACL filtering
+   * @param hybridWeight - Weight for hybrid search (0.0 = BM25 only, 1.0 = Vector only, 0.5 = equal weight)
    * @returns Promise resolving to structured retrieval result
    */
   async retrieve(
     query: string,
     orgId: string,
     topK: number = 20,
+    hybridWeight: number = 0.5,
   ): Promise<RetrievalResult> {
     if (!query || query.trim().length === 0) {
       throw new Error('Query cannot be empty');
@@ -64,51 +70,88 @@ export class RetrievalService {
     if (topK <= 0) {
       throw new Error('topK must be greater than 0');
     }
+    if (hybridWeight < 0 || hybridWeight > 1) {
+      throw new Error('hybridWeight must be between 0 and 1');
+    }
 
-    this.logger.log(`Starting retrieval for query: "${query.substring(0, 100)}..."`);
+    this.logger.log(
+      `Starting hybrid retrieval for query: "${query.substring(0, 100)}..." (weight: ${hybridWeight})`,
+    );
 
     // Step 1: Expand query with synonyms and related terms for better semantic matching
     const expandedQuery = this.expandQuery(query);
     this.logger.debug(`Expanded query: "${expandedQuery}"`);
 
-    // Step 2: Embed expanded query
-    this.logger.debug('Step 2: Embedding expanded query...');
-    const queryEmbedding = await this.embeddingService.embed(expandedQuery);
-    this.logger.debug(
-      `Query embedding generated: ${queryEmbedding.length} dimensions`,
-    );
-
-    // Step 3: Fetch topK chunks using similarity search
+    // Step 2: Perform both BM25 and Vector search in parallel
     // Fetch more chunks than needed to allow for re-ranking with metadata boosting
     const fetchK = Math.min(topK * 2, 50); // Fetch up to 2x or 50, whichever is smaller
-    this.logger.debug(`Step 2: Fetching top ${fetchK} chunks for re-ranking...`);
-    const searchResults = await this.vectorStoreService.similaritySearch(
-      queryEmbedding,
-      fetchK,
-      orgId,
+    this.logger.debug(`Fetching top ${fetchK} chunks from both search methods...`);
+
+    // Parallel execution of BM25 and Vector search
+    const [vectorResults, bm25Results] = await Promise.all([
+      // Vector search: Embed expanded query and search
+      (async () => {
+        this.logger.debug('Performing vector similarity search...');
+        const queryEmbedding = await this.embeddingService.embed(expandedQuery);
+        this.logger.debug(
+          `Query embedding generated: ${queryEmbedding.length} dimensions`,
+        );
+        return this.vectorStoreService.similaritySearch(
+          queryEmbedding,
+          fetchK,
+          orgId,
+        );
+      })(),
+      // BM25 search: Keyword-based search
+      (async () => {
+        this.logger.debug('Performing BM25 keyword search...');
+        const bm25Results = await this.bm25SearchService.bm25Search(
+          query,
+          fetchK,
+          orgId,
+        );
+        // Convert BM25 results to SimilaritySearchResult format
+        return this.bm25SearchService.convertToSimilarityResults(bm25Results);
+      })(),
+    ]);
+
+    this.logger.log(
+      `Vector search: ${vectorResults.length} results, BM25 search: ${bm25Results.length} results`,
+    );
+
+    // Step 3: Combine results using hybrid scoring
+    const hybridResults = this.combineHybridResults(
+      vectorResults,
+      bm25Results,
+      hybridWeight,
     );
 
     this.logger.log(
-      `Retrieved ${searchResults.length} chunks for org ${orgId}`,
+      `Hybrid search combined ${hybridResults.length} unique chunks`,
     );
 
-    // Step 2.5: Apply metadata-based boosting and re-rank
-    const boostedResults = this.applyMetadataBoosting(searchResults);
-    
+    // Step 4: Apply metadata-based boosting and re-rank
+    const boostedResults = this.applyMetadataBoosting(hybridResults);
+
     // Take top K after boosting
     const topResults = boostedResults.slice(0, topK);
 
     // Log scoring information for each chunk
     if (topResults.length > 0) {
-      this.logger.log('Retrieval scoring results (after boosting):');
+      this.logger.log('Hybrid retrieval scoring results (after boosting):');
       topResults.forEach((result, index) => {
-        const boostInfo = result.metadata?.boostApplied 
-          ? ` | Boost: +${result.metadata.boostApplied.toFixed(3)}` 
+        const boostInfo = result.metadata?.boostApplied
+          ? ` | Boost: +${result.metadata.boostApplied.toFixed(3)}`
+          : '';
+        const vectorScore = result.metadata?.vectorScore
+          ? ` | Vector: ${result.metadata.vectorScore.toFixed(4)}`
+          : '';
+        const bm25Score = result.metadata?.bm25Score
+          ? ` | BM25: ${result.metadata.bm25Score.toFixed(4)}`
           : '';
         this.logger.log(
           `  [${index + 1}] Chunk ${result.chunkId.substring(0, 8)}... | ` +
-            `Similarity: ${result.similarity.toFixed(4)}${boostInfo} | ` +
-            `Distance: ${result.distance.toFixed(4)} | ` +
+            `Hybrid: ${result.similarity.toFixed(4)}${vectorScore}${bm25Score}${boostInfo} | ` +
             `Document: ${result.documentTitle || result.documentId.substring(0, 8)}...`,
         );
       });
@@ -116,15 +159,15 @@ export class RetrievalService {
       this.logger.warn('No chunks retrieved for query');
     }
 
-    // Step 4: Format context block
-    this.logger.debug('Step 3: Formatting context block...');
+    // Step 5: Format context block
+    this.logger.debug('Formatting context block...');
     const context = this.formatContextBlock(topResults);
 
     // Calculate metadata
     const similarities = topResults.map((r) => r.similarity);
     const metadata = {
       topK,
-      totalChunks: searchResults.length,
+      totalChunks: hybridResults.length,
       avgSimilarity:
         similarities.length > 0
           ? similarities.reduce((a, b) => a + b, 0) / similarities.length
@@ -136,12 +179,12 @@ export class RetrievalService {
     };
 
     this.logger.log(
-      `Retrieval complete: ${metadata.totalChunks} chunks, ` +
+      `Hybrid retrieval complete: ${metadata.totalChunks} chunks, ` +
         `avg similarity: ${metadata.avgSimilarity.toFixed(4)}, ` +
         `range: [${metadata.minSimilarity.toFixed(4)}, ${metadata.maxSimilarity.toFixed(4)}]`,
     );
 
-    // Step 5: Return structured retrieval result
+    // Step 6: Return structured retrieval result
     return {
       query,
       chunks: topResults.map((result) => ({
@@ -308,6 +351,113 @@ export class RetrievalService {
     });
 
     return contextParts.join('\n\n---\n\n');
+  }
+
+  /**
+   * Combine BM25 and Vector search results using weighted hybrid scoring
+   * Normalizes scores from both methods and combines them based on hybridWeight
+   * 
+   * @param vectorResults - Results from vector similarity search
+   * @param bm25Results - Results from BM25 keyword search
+   * @param hybridWeight - Weight for vector search (0.0 = BM25 only, 1.0 = Vector only, 0.5 = equal)
+   * @returns Combined and ranked results
+   */
+  private combineHybridResults(
+    vectorResults: SimilaritySearchResult[],
+    bm25Results: SimilaritySearchResult[],
+    hybridWeight: number,
+  ): SimilaritySearchResult[] {
+    // Create a map to store combined results by chunkId
+    const combinedMap = new Map<string, SimilaritySearchResult>();
+
+    // Add vector results to the map
+    vectorResults.forEach((result) => {
+      combinedMap.set(result.chunkId, {
+        ...result,
+        metadata: {
+          ...result.metadata,
+          vectorScore: result.similarity,
+        },
+      });
+    });
+
+    // Merge BM25 results, combining scores where chunks appear in both
+    bm25Results.forEach((result) => {
+      const existing = combinedMap.get(result.chunkId);
+      const bm25Score = result.similarity;
+
+      if (existing) {
+        // Chunk appears in both results - combine scores
+        const vectorScore = existing.metadata?.vectorScore ?? existing.similarity;
+        const hybridScore =
+          hybridWeight * vectorScore + (1 - hybridWeight) * bm25Score;
+
+        combinedMap.set(result.chunkId, {
+          ...existing,
+          similarity: hybridScore,
+          distance: 1 - hybridScore,
+          metadata: {
+            ...existing.metadata,
+            vectorScore,
+            bm25Score,
+            hybridScore,
+            hybridWeight,
+          },
+        });
+      } else {
+        // Chunk only appears in BM25 results
+        // Scale BM25 score by (1 - hybridWeight) to reflect its contribution
+        const hybridScore = (1 - hybridWeight) * bm25Score;
+
+        combinedMap.set(result.chunkId, {
+          ...result,
+          similarity: hybridScore,
+          distance: 1 - hybridScore,
+          metadata: {
+            ...result.metadata,
+            vectorScore: 0, // No vector match
+            bm25Score,
+            hybridScore,
+            hybridWeight,
+          },
+        });
+      }
+    });
+
+    // Update chunks that only appeared in vector results
+    vectorResults.forEach((result) => {
+      const existing = combinedMap.get(result.chunkId);
+      if (existing && !existing.metadata?.bm25Score) {
+        // Chunk only appears in vector results
+        const vectorScore = result.similarity;
+        const hybridScore = hybridWeight * vectorScore;
+
+        combinedMap.set(result.chunkId, {
+          ...existing,
+          similarity: hybridScore,
+          distance: 1 - hybridScore,
+          metadata: {
+            ...existing.metadata,
+            vectorScore,
+            bm25Score: 0, // No BM25 match
+            hybridScore,
+            hybridWeight,
+          },
+        });
+      }
+    });
+
+    // Convert map to array and sort by hybrid score (descending)
+    const combinedResults = Array.from(combinedMap.values()).sort(
+      (a, b) => b.similarity - a.similarity,
+    );
+
+    this.logger.debug(
+      `Combined ${vectorResults.length} vector + ${bm25Results.length} BM25 = ` +
+        `${combinedResults.length} unique chunks (weight: ${hybridWeight})`,
+    );
+
+    return combinedResults;
   }
 }
 
