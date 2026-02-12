@@ -47,7 +47,139 @@ A **production-ready, multi-tenant secure RAG system** designed to index documen
 
 ### Installation
 
-(Instructions to be added)
+1. **Clone the repository:**
+   ```bash
+   git clone <repository-url>
+   cd ai-devops-knowledge-copilot
+   ```
+
+2. **Set up environment variables:**
+   ```bash
+   cp env.example .env
+   ```
+   
+   Edit `.env` and configure:
+   - Database credentials (or use defaults)
+   - `JWT_SECRET` - Change to a secure random string in production
+   - `OPENAI_API_KEY` - Required if using OpenAI for embeddings/LLM
+   - `GITHUB_TOKEN` - Optional but recommended to avoid rate limits
+   - Embedding provider settings (see [Embedding Service Configuration](#embedding-service-configuration))
+
+3. **Start Docker services (PostgreSQL + Redis):**
+   ```bash
+   docker-compose up -d
+   ```
+   
+   This starts:
+   - PostgreSQL with pgvector extension on port 5432
+   - Redis on port 6379
+
+4. **Install backend dependencies:**
+   ```bash
+   cd backend
+   npm install
+   # or
+   pnpm install
+   ```
+
+5. **Run database migrations:**
+   ```bash
+   cd backend
+   npm run migration:run
+   ```
+   
+   This creates all necessary tables and enables the pgvector extension.
+
+6. **Verify database setup (optional):**
+   ```bash
+   npm run test:vector
+   ```
+
+7. **Start the backend server:**
+   ```bash
+   npm run start:dev
+   ```
+   
+   The backend will run on `http://localhost:3000`
+
+8. **Install frontend dependencies (in a new terminal):**
+   ```bash
+   cd frontend
+   npm install
+   # or
+   pnpm install
+   ```
+
+9. **Configure frontend API URL (optional):**
+   
+   Create a `.env` file in the `frontend` directory:
+   ```bash
+   VITE_API_URL=http://localhost:3000
+   ```
+   
+   If not set, it defaults to `http://localhost:3000`.
+
+10. **Start the frontend development server:**
+    ```bash
+    npm run dev
+    ```
+    
+    The frontend will run on `http://localhost:5173` (or another port if 5173 is busy)
+
+11. **Create your first user:**
+    
+    You can register via the frontend UI, or use the API:
+    ```bash
+    curl -X POST http://localhost:3000/auth/register \
+      -H "Content-Type: application/json" \
+      -d '{
+        "email": "admin@example.com",
+        "password": "your-secure-password",
+        "orgId": "your-org-id",
+        "role": "admin"
+      }'
+    ```
+
+### Quick Start (All-in-One)
+
+For a quick setup, you can run everything in sequence:
+
+```bash
+# 1. Copy environment file
+cp env.example .env
+# Edit .env with your API keys
+
+# 2. Start Docker services
+docker-compose up -d
+
+# 3. Setup backend
+cd backend
+npm install
+npm run migration:run
+npm run start:dev &
+cd ..
+
+# 4. Setup frontend (in new terminal)
+cd frontend
+npm install
+npm run dev
+```
+
+### Production Build
+
+**Backend:**
+```bash
+cd backend
+npm run build
+npm run start:prod
+```
+
+**Frontend:**
+```bash
+cd frontend
+npm run build
+# Serve the dist/ directory with your web server (nginx, etc.)
+```
 
 ## Embedding Service Configuration
 
