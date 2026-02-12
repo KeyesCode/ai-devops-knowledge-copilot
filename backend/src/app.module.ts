@@ -6,6 +6,9 @@ import { AppService } from './app.service';
 import { EmbeddingsModule } from './embeddings/embeddings.module';
 import { VectorStoreModule } from './vector-store/vector-store.module';
 import { GitHubModule } from './github/github.module';
+import { RetrievalModule } from './retrieval/retrieval.module';
+import { LLMModule } from './llm/llm.module';
+import { ChatModule } from './chat/chat.module';
 
 @Module({
   imports: [
@@ -36,6 +39,9 @@ import { GitHubModule } from './github/github.module';
     EmbeddingsModule,
     VectorStoreModule,
     GitHubModule,
+    RetrievalModule,
+    LLMModule,
+    ChatModule,
   ],
   controllers: [AppController],
   providers: [AppService],
