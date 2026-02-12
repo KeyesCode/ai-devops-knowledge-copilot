@@ -1,7 +1,7 @@
 .eval-dashboard {
   height: 100%;
   background: #1a1a1a;
-  padding: 20px;
+  padding: 0 20px 20px 20px;
   overflow-y: auto;
   color: rgba(255, 255, 255, 0.87);
 }
