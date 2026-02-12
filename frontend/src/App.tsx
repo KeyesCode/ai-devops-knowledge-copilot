@@ -1,11 +1,30 @@
-import { Chat } from './components/Chat'
-import './App.css'
+import { useAuth } from './contexts/AuthContext';
+import { Chat } from './components/Chat';
+import { Auth } from './components/Auth';
+import './App.css';
 
 function App() {
-  // TODO: Get orgId from auth context or props
-  const orgId = 'default-org-id'
+  const { isAuthenticated, user, isLoading } = useAuth();
 
-  return <Chat orgId={orgId} topK={10} />
+  if (isLoading) {
+    return (
+      <div style={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center', 
+        height: '100vh',
+        fontSize: '1.2rem'
+      }}>
+        Loading...
+      </div>
+    );
+  }
+
+  if (!isAuthenticated || !user) {
+    return <Auth />;
+  }
+
+  return <Chat orgId={user.orgId} topK={10} />;
 }
 
-export default App
+export default App;
