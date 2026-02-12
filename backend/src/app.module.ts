@@ -8,6 +8,7 @@ import { AppService } from './app.service';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      envFilePath: ['../.env', '.env'],
     }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
