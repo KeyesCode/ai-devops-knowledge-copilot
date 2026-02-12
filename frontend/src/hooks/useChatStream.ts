@@ -1,4 +1,5 @@
 import { useCallback, useRef } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 
 export interface ChatMessage {
   id: string;
@@ -18,7 +19,6 @@ export interface Citation {
 
 export interface ChatStreamOptions {
   query: string;
-  orgId: string;
   topK?: number;
   conversationHistory?: Array<{
     role: 'user' | 'assistant';
@@ -33,10 +33,16 @@ export interface ChatStreamOptions {
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 export function useChatStream() {
+  const { token } = useAuth();
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const streamChat = useCallback(
     async (options: ChatStreamOptions): Promise<void> => {
+      if (!token) {
+        options.onError?.('Not authenticated');
+        return;
+      }
+
       // Abort any existing stream
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
@@ -49,10 +55,10 @@ export function useChatStream() {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
           },
           body: JSON.stringify({
             query: options.query,
-            orgId: options.orgId,
             topK: options.topK || 10,
             conversationHistory: options.conversationHistory || [],
           }),
@@ -128,7 +134,7 @@ export function useChatStream() {
         options.onError?.(errorMessage);
       }
     },
-    [],
+    [token],
   );
 
   const abort = useCallback(() => {

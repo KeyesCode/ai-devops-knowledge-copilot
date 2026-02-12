@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from 'react';
 import { useChatStream } from '../hooks/useChatStream';
 import type { ChatMessage, Citation } from '../hooks/useChatStream';
+import { useAuth } from '../contexts/AuthContext';
 import { MessageList } from './MessageList';
 import { ChatInput } from './ChatInput';
 import { CitationPanel } from './CitationPanel';
@@ -12,6 +13,7 @@ interface ChatProps {
 }
 
 export function Chat({ orgId, topK = 10 }: ChatProps) {
+  const { user, logout } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -59,7 +61,6 @@ export function Chat({ orgId, topK = 10 }: ChatProps) {
       try {
         await streamChat({
           query,
-          orgId,
           topK,
           conversationHistory,
           onToken: (content: string) => {
@@ -111,7 +112,7 @@ export function Chat({ orgId, topK = 10 }: ChatProps) {
         currentMessageIdRef.current = null;
       }
     },
-    [orgId, topK, messages, isStreaming, streamChat],
+    [topK, messages, isStreaming, streamChat],
   );
 
   const handleAbort = useCallback(() => {
@@ -130,15 +131,33 @@ export function Chat({ orgId, topK = 10 }: ChatProps) {
   return (
     <div className="chat-container">
       <div className="chat-header">
-        <h1>AI DevOps Knowledge Copilot</h1>
-        {citations.length > 0 && (
+        <div className="chat-header-left">
+          <h1>AI DevOps Knowledge Copilot</h1>
+          {user && (
+            <div className="chat-user-info">
+              <span className="chat-user-email">{user.email}</span>
+              <span className="chat-user-org">Org: {user.orgId}</span>
+              <span className="chat-user-role">({user.role})</span>
+            </div>
+          )}
+        </div>
+        <div className="chat-header-right">
+          {citations.length > 0 && (
+            <button
+              className="citation-button"
+              onClick={() => setShowCitations(true)}
+            >
+              View Sources ({citations.length})
+            </button>
+          )}
           <button
-            className="citation-button"
-            onClick={() => setShowCitations(true)}
+            className="logout-button"
+            onClick={logout}
+            title="Logout"
           >
-            View Sources ({citations.length})
+            Logout
           </button>
-        )}
+        </div>
       </div>
 
       {error && (

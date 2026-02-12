@@ -24,7 +24,8 @@
     "migration:show": "typeorm-ts-node-commonjs migration:show -d src/data-source.ts",
     "test:vector": "ts-node -r tsconfig-paths/register src/scripts/test-vector.ts",
     "test:embedding": "ts-node -r tsconfig-paths/register src/scripts/test-embedding.ts",
-    "test:auth": "ts-node -r tsconfig-paths/register src/scripts/test-auth.ts"
+    "test:auth": "ts-node -r tsconfig-paths/register src/scripts/test-auth.ts",
+    "create-test-user": "ts-node -r tsconfig-paths/register src/scripts/create-test-user.ts"
   },
   "dependencies": {
     "@nestjs/cache-manager": "^3.1.0",

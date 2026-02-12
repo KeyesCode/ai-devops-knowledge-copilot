@@ -1,4 +1,6 @@
 import { useEffect, useRef } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import type { ChatMessage } from '../hooks/useChatStream';
 import './MessageList.css';
 
@@ -30,7 +32,16 @@ export function MessageList({ messages }: MessageListProps) {
               {message.role === 'user' ? 'You' : 'Assistant'}
             </div>
             <div className="message-content">
-              {message.content || (message.isStreaming ? '...' : '')}
+              {message.role === 'assistant' ? (
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  className="markdown-content"
+                >
+                  {message.content || (message.isStreaming ? '...' : '')}
+                </ReactMarkdown>
+              ) : (
+                message.content || (message.isStreaming ? '...' : '')
+              )}
               {message.isStreaming && (
                 <span className="message-streaming-indicator">▋</span>
               )}
