@@ -17,8 +17,17 @@ export interface Citation {
   content: string;
 }
 
+export interface ConversationUpdate {
+  conversationId: string;
+  messageCount: number;
+  title: string | null;
+  totalTokens: number;
+  updatedAt: string;
+}
+
 export interface ChatStreamOptions {
   query: string;
+  conversationId?: string;
   topK?: number;
   conversationHistory?: Array<{
     role: 'user' | 'assistant';
@@ -26,6 +35,8 @@ export interface ChatStreamOptions {
   }>;
   onToken?: (content: string) => void;
   onCitations?: (citations: Citation[]) => void;
+  onConversationId?: (conversationId: string) => void;
+  onConversationUpdate?: (update: ConversationUpdate) => void;
   onError?: (error: string) => void;
   onComplete?: () => void;
 }
@@ -59,6 +70,7 @@ export function useChatStream() {
           },
           body: JSON.stringify({
             query: options.query,
+            conversationId: options.conversationId,
             topK: options.topK || 20,
             conversationHistory: options.conversationHistory || [],
           }),
@@ -113,6 +125,10 @@ export function useChatStream() {
                 options.onToken?.(data.content);
               } else if (eventType === 'citations' && data.citations) {
                 options.onCitations?.(data.citations);
+              } else if (eventType === 'conversationId' && data.conversationId) {
+                options.onConversationId?.(data.conversationId);
+              } else if (eventType === 'conversationUpdate' && data.conversationId) {
+                options.onConversationUpdate?.(data);
               } else if (eventType === 'error' && data.error) {
                 options.onError?.(data.error);
               } else if (eventType === 'done') {

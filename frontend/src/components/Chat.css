@@ -1,12 +1,19 @@
 .chat-container {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   height: 100%;
-  max-width: 1200px;
-  margin: 0 auto;
+  width: 100%;
   background-color: #1a1a1a;
   color: rgba(255, 255, 255, 0.87);
-  width: 100%;
+  overflow: hidden;
+}
+
+.chat-main {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  height: 100%;
+  overflow: hidden;
 }
 
 .chat-header {

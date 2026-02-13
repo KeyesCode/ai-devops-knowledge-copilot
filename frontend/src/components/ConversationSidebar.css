@@ -1,0 +1,182 @@
+.conversation-sidebar {
+  width: 300px;
+  height: 100%;
+  background-color: #242424;
+  border-right: 1px solid #333;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.87);
+}
+
+.conversation-sidebar-header {
+  padding: 16px;
+  border-bottom: 1px solid #333;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #1a1a1a;
+}
+
+.conversation-sidebar-header h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.87);
+}
+
+.conversation-sidebar-header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.new-conversation-button {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background-color: #007bff;
+  color: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s;
+}
+
+.new-conversation-button:hover {
+  background-color: #0056b3;
+}
+
+.conversation-sidebar-error {
+  padding: 12px 16px;
+  background-color: #4a1a1a;
+  color: #ff6b6b;
+  font-size: 14px;
+}
+
+.conversation-sidebar-loading,
+.conversation-sidebar-empty {
+  padding: 24px 16px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.conversation-sidebar-empty button {
+  margin-top: 12px;
+  padding: 8px 16px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.conversation-sidebar-empty button:hover {
+  background-color: #0056b3;
+}
+
+.conversation-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.conversation-item {
+  padding: 12px;
+  margin-bottom: 8px;
+  background-color: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.conversation-item:hover {
+  background-color: #2a2a2a;
+  border-color: #646cff;
+}
+
+.conversation-item.active {
+  background-color: rgba(100, 108, 255, 0.2);
+  border-color: #646cff;
+}
+
+.conversation-item-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.conversation-title {
+  font-weight: 500;
+  font-size: 14px;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.conversation-meta {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.conversation-actions {
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.conversation-item:hover .conversation-actions {
+  opacity: 1;
+}
+
+.conversation-edit-button,
+.conversation-delete-button {
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.conversation-edit-button:hover,
+.conversation-delete-button:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+.conversation-edit {
+  width: 100%;
+}
+
+.conversation-edit input {
+  width: 100%;
+  padding: 4px 8px;
+  border: 1px solid #646cff;
+  border-radius: 4px;
+  font-size: 14px;
+  font-family: inherit;
+  background-color: #1a1a1a;
+  color: rgba(255, 255, 255, 0.87);
+}
+
+.conversation-edit input:focus {
+  outline: none;
+  border-color: #535bf2;
+}
+
