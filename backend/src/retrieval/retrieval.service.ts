@@ -5,6 +5,7 @@ import {
   SimilaritySearchResult,
 } from '../vector-store/vector-store.service';
 import { BM25SearchService } from '../vector-store/bm25-search.service';
+import { RerankerService } from './reranker.service';
 
 export interface RetrievalResult {
   query: string;
@@ -38,16 +39,18 @@ export class RetrievalService {
     private readonly embeddingService: EmbeddingService,
     private readonly vectorStoreService: VectorStoreService,
     private readonly bm25SearchService: BM25SearchService,
+    private readonly rerankerService: RerankerService,
   ) {}
 
   /**
-   * Perform full RAG retrieval pipeline with hybrid search (BM25 + Vector):
+   * Perform full RAG retrieval pipeline with hybrid search (BM25 + Vector) + Cross-Encoder Reranking:
    * 1. Embed user query
    * 2. Perform both BM25 (keyword) and Vector (semantic) search in parallel
    * 3. Combine and normalize scores from both methods
    * 4. Apply metadata-based boosting
-   * 5. Format context block
-   * 6. Return structured retrieval result with scoring
+   * 5. Rerank results using cross-encoder model (if enabled)
+   * 6. Format context block
+   * 7. Return structured retrieval result with scoring
    *
    * @param query - The user query string
    * @param topK - Number of top chunks to retrieve (default: 20)
@@ -84,7 +87,8 @@ export class RetrievalService {
 
     // Step 2: Perform both BM25 and Vector search in parallel
     // Fetch more chunks than needed to allow for re-ranking with metadata boosting
-    const fetchK = Math.min(topK * 2, 50); // Fetch up to 2x or 50, whichever is smaller
+    // For reranking to be effective, we need more candidates (reranking works best with 50-100 candidates)
+    const fetchK = Math.min(topK * 4, 80); // Fetch up to 4x or 80, whichever is smaller
     this.logger.debug(`Fetching top ${fetchK} chunks from both search methods...`);
 
     // Parallel execution of BM25 and Vector search
@@ -133,12 +137,24 @@ export class RetrievalService {
     // Step 4: Apply metadata-based boosting and re-rank
     const boostedResults = this.applyMetadataBoosting(hybridResults);
 
-    // Take top K after boosting
-    const topResults = boostedResults.slice(0, topK);
+    // Step 5: Rerank using cross-encoder (if enabled)
+    // Fetch more candidates for reranking to get better results
+    const rerankCandidates = boostedResults.slice(0, Math.min(topK * 2, boostedResults.length));
+    const rerankedResults = await this.rerankerService.rerank(
+      query,
+      rerankCandidates,
+      topK,
+    );
+
+    // Take top K after reranking
+    const topResults = rerankedResults;
 
     // Log scoring information for each chunk
     if (topResults.length > 0) {
-      this.logger.log('Hybrid retrieval scoring results (after boosting):');
+      const rerankerEnabled = this.rerankerService.isEnabled();
+      this.logger.log(
+        `Hybrid retrieval scoring results (after ${rerankerEnabled ? 'reranking' : 'boosting'}):`,
+      );
       topResults.forEach((result, index) => {
         const boostInfo = result.metadata?.boostApplied
           ? ` | Boost: +${result.metadata.boostApplied.toFixed(3)}`
@@ -149,9 +165,16 @@ export class RetrievalService {
         const bm25Score = result.metadata?.bm25Score
           ? ` | BM25: ${result.metadata.bm25Score.toFixed(4)}`
           : '';
+        const rerankInfo = result.metadata?.rerankScore
+          ? ` | Rerank: ${result.metadata.rerankScore.toFixed(4)}`
+          : '';
+        const originalRankInfo =
+          result.metadata?.originalRank !== undefined
+            ? ` | Original Rank: ${result.metadata.originalRank + 1}`
+            : '';
         this.logger.log(
           `  [${index + 1}] Chunk ${result.chunkId.substring(0, 8)}... | ` +
-            `Hybrid: ${result.similarity.toFixed(4)}${vectorScore}${bm25Score}${boostInfo} | ` +
+            `Final: ${result.similarity.toFixed(4)}${vectorScore}${bm25Score}${boostInfo}${rerankInfo}${originalRankInfo} | ` +
             `Document: ${result.documentTitle || result.documentId.substring(0, 8)}...`,
         );
       });
@@ -159,7 +182,7 @@ export class RetrievalService {
       this.logger.warn('No chunks retrieved for query');
     }
 
-    // Step 5: Format context block
+    // Step 6: Format context block
     this.logger.debug('Formatting context block...');
     const context = this.formatContextBlock(topResults);
 
@@ -184,7 +207,7 @@ export class RetrievalService {
         `range: [${metadata.minSimilarity.toFixed(4)}, ${metadata.maxSimilarity.toFixed(4)}]`,
     );
 
-    // Step 6: Return structured retrieval result
+    // Step 7: Return structured retrieval result
     return {
       query,
       chunks: topResults.map((result) => ({
