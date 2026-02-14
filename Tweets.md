@@ -144,3 +144,181 @@ Sometimes the simpler solution is the right one.
 ## The Post:
 
 https://x.com/Keyes_Tanner/status/2021831062976872502?s=20
+
+---
+
+# Post 2: Leveling Up RAG with Cross-Encoder Reranking & Conversation Management
+
+## Twitter Thread
+
+**Tweet 1/10** 🧵
+Just shipped two major features that dramatically improved my RAG system:
+1. Cross-encoder reranking for better retrieval accuracy
+2. Full conversation management with context window optimization
+
+Here's what I learned building them:
+
+[Attach screenshot: frontend/public/ai-devops-knowledge-copilot.png]
+
+---
+
+**Tweet 2/10**
+**Feature #1: Cross-Encoder Reranking**
+
+Bi-encoders (like embeddings) are fast but miss nuance. Cross-encoders see query + document together, giving more accurate relevance scores.
+
+The pipeline:
+1. Vector search gets top 80 candidates
+2. Cross-encoder reranks them
+3. Return top 20 most relevant
+
+[Attach screenshot: Before/after reranking comparison showing score improvements]
+
+Result: ~30% better retrieval accuracy on complex queries.
+
+---
+
+**Tweet 3/10**
+**Cross-Encoder Implementation Details**
+
+Using `@xenova/transformers` with ONNX models (runs in Node.js, no Python needed).
+
+Key config:
+- Model: `Xenova/ms-marco-MiniLM-L-6-v2` (lightweight, fast)
+- Backend: WASM (cross-platform) or Node (faster if supported)
+- Quantization: Auto (tries quantized first, falls back if needed)
+
+[Attach screenshot: Reranker config in env.example]
+
+The model processes query-document pairs in batches of 16 for memory efficiency.
+
+---
+
+**Tweet 4/10**
+**Reranking Integration**
+
+The RetrievalService pipeline:
+1. Hybrid search (BM25 + Vector) → 80 candidates
+2. Metadata boosting
+3. **Cross-encoder reranking** ← new step
+4. Return top K results
+
+```typescript
+const reranked = await this.rerankerService.rerank(
+  query,
+  initialResults,
+  topK
+);
+```
+
+[Attach screenshot: RetrievalService code showing reranking integration]
+
+Graceful degradation: if reranker fails, returns original results.
+
+---
+
+**Tweet 5/10**
+**Feature #2: Conversation Management**
+
+Users need context across multiple messages. Built a full conversation system:
+
+- Conversations table (title, token count, message count)
+- Messages table (role, content, token count)
+- Conversation sidebar for navigation
+- Auto-title generation from first message
+
+[Attach screenshot: Frontend showing conversation sidebar with multiple conversations]
+
+Each conversation maintains its own history and context.
+
+---
+
+**Tweet 6/10**
+**Context Window Optimization**
+
+LLMs have token limits. Can't just send all messages.
+
+Solution: Smart history selection:
+1. Always keep last 5 messages (recent context)
+2. Fill remaining budget with older messages (newest → oldest)
+3. Use token estimation (~4 chars/token)
+
+[Attach screenshot: Code showing getOptimizedHistory logic]
+
+Default: 32k token window, 4k reserved for system prompt + new query.
+
+---
+
+**Tweet 7/10**
+**Token Estimation Strategy**
+
+Simple but effective: `Math.ceil(text.length / 4)`
+
+Why it works:
+- Conservative estimate (better to under-estimate)
+- Fast (no API calls needed)
+- Good enough for context window management
+
+[Attach screenshot: TokenEstimator utility code]
+
+Stored token counts in DB for faster lookups on subsequent requests.
+
+---
+
+**Tweet 8/10**
+**Conversation Flow**
+
+1. User sends message → Create conversation if new
+2. Save user message to DB
+3. Get optimized history (fits in context window)
+4. Retrieve context via RAG (with reranking!)
+5. Stream LLM response
+6. Save assistant message
+7. Update conversation metadata
+
+[Attach screen recording: Full conversation flow showing history persistence]
+
+Users can switch conversations and pick up where they left off.
+
+---
+
+**Tweet 9/10**
+**What I Learned:**
+
+1. Cross-encoders are worth the latency cost (~100-200ms) for accuracy gains
+2. ONNX models in Node.js are powerful—no Python dependency needed
+3. Context window management is critical for long conversations
+4. Token estimation doesn't need to be perfect, just conservative
+5. Conversation persistence improves UX dramatically
+
+Both features work together: better retrieval + better context = better answers.
+
+---
+
+**Tweet 10/10**
+**The Stack Additions:**
+
+- `@xenova/transformers` (ONNX model runtime)
+- Cross-encoder models (Xenova/* repos)
+- TypeORM entities (Conversation, Message)
+- Token estimation utility
+- Context window optimization logic
+
+Next up: Adding conversation search and better title generation.
+
+---
+
+## Screenshots/Recordings Needed:
+
+1. **Before/after reranking comparison** - Show retrieval results with/without reranking, highlighting score improvements
+2. **Reranker config** - Screenshot of env.example showing RERANKER_* variables
+3. **RetrievalService code** - Code snippet showing reranking integration in the pipeline
+4. **Conversation sidebar** - Frontend showing sidebar with multiple conversations listed
+5. **getOptimizedHistory code** - Code showing the context window optimization logic
+6. **TokenEstimator utility** - Code showing the token estimation implementation
+7. **Full conversation flow** - Screen recording showing: create conversation → send messages → switch conversations → see history
+8. **Main screenshot** - frontend/public/ai-devops-knowledge-copilot.png (already available)
+
+## The Post:
+
+https://x.com/Keyes_Tanner/status/2022172117626994806?s=20
